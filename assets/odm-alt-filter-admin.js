@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
         input.addEventListener('change', function(event) {
             const postId = event.target.getAttribute('data-post-id');
             const newValue = event.target.value;
+            const iconElement = event.target.nextElementSibling;
 
             fetch(ajaxurl, {
                 method: 'POST',
@@ -21,6 +22,17 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // If the alt text is empty, set the warning icon, else set the success icon
+                    if (data.data.isEmpty) {
+                        iconElement.classList.remove('dashicons-yes-alt');
+                        iconElement.classList.add('dashicons-warning');
+                        iconElement.removeAttribute('title');
+                    } else {
+                        iconElement.classList.remove('dashicons-warning');
+                        iconElement.classList.add('dashicons-yes-alt');
+                        iconElement.setAttribute('title', newValue);
+                    }
+
                     displayFeedback(event.target, 'Saved!', 'success');
                 } else {
                     displayFeedback(event.target, 'Error saving.', 'error');

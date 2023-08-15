@@ -70,31 +70,89 @@ function odm_render_drop_down_filter_options()
 }
 add_action('restrict_manage_posts', 'odm_render_drop_down_filter_options');
 
+// function odm_pre_get_posts($query)
+// {
+// 	if (!odm_is_on_media_admin_page() || !$query->is_main_query()) {
+// 		return;
+// 	}
+
+// 	$selected_filter_option = odm_get_filter_from_query_args();
+// 	if (empty($selected_filter_option) || $selected_filter_option == 'no-filter') {
+// 		return;
+// 	}
+
+// 	$img_alt_meta_query = null;
+// 	if ($selected_filter_option == 'only-with-alt') {
+// 		$img_alt_meta_query = array('key' => '_wp_attachment_image_alt', 'compare' => 'EXISTS');
+// 	} elseif ($selected_filter_option == 'only-without-alt') {
+// 		$img_alt_meta_query = array('key' => '_wp_attachment_image_alt', 'compare' => 'NOT EXISTS');
+// 	}
+
+// 	if ($img_alt_meta_query) {
+// 		$meta_query = $query->get('meta_query') ?? array('relation' => 'AND');
+// 		$meta_query[] = $img_alt_meta_query;
+// 		$query->set('meta_query', $meta_query);
+// 		$query->set('post_mime_type', ODM_IMAGE_MIME_TYPES);
+// 	}
+// }
+
 function odm_pre_get_posts($query)
 {
-	if (!odm_is_on_media_admin_page() || !$query->is_main_query()) {
+	if (!odm_is_on_media_admin_page()) {
+		// We're not on the list-view media page in the back-end.
+		return;
+	}
+
+	if (!$query->is_main_query()) {
+		// We're not on the main query, so don't do anything.
 		return;
 	}
 
 	$selected_filter_option = odm_get_filter_from_query_args();
-	if (empty($selected_filter_option) || $selected_filter_option == 'no-filter') {
+
+	if (empty($selected_filter_option)) {
+		// The user hasn't chosen an IMG ALT Text filter option.
+		return;
+	}
+
+	if ($selected_filter_option == 'no-filter') {
+		// The user has selected the "no-filter" option, so don't do anything.
 		return;
 	}
 
 	$img_alt_meta_query = null;
+
 	if ($selected_filter_option == 'only-with-alt') {
-		$img_alt_meta_query = array('key' => '_wp_attachment_image_alt', 'compare' => 'EXISTS');
+		$img_alt_meta_query = array(
+			'key' => '_wp_attachment_image_alt',
+			'compare' => 'EXISTS',
+		);
 	} elseif ($selected_filter_option == 'only-without-alt') {
-		$img_alt_meta_query = array('key' => '_wp_attachment_image_alt', 'compare' => 'NOT EXISTS');
+		$img_alt_meta_query = array(
+			'key' => '_wp_attachment_image_alt',
+			'compare' => 'NOT EXISTS',
+		);
 	}
 
-	if ($img_alt_meta_query) {
-		$meta_query = $query->get('meta_query') ?? array('relation' => 'AND');
+	if (!empty($img_alt_meta_query)) {
+		$meta_query = $query->get('meta_query');
+
+		// Ensure that meta_query is an array
+		if (!is_array($meta_query)) {
+			$meta_query = array();
+		}
+
 		$meta_query[] = $img_alt_meta_query;
+
+		// Set the query's "meta_query" to our filter.
 		$query->set('meta_query', $meta_query);
+
+		// We also want to only include posts (attachments) that have an image
+		// in "post_mime_type" like this:
 		$query->set('post_mime_type', ODM_IMAGE_MIME_TYPES);
 	}
 }
+
 add_action('pre_get_posts', 'odm_pre_get_posts');
 
 function odm_admin_enqueue_scripts($hook_suffix)
@@ -141,6 +199,12 @@ function odm_save_alt_text()
 	$alt_text = isset($_POST['alt_text']) ? sanitize_text_field($_POST['alt_text']) : '';
 
 	update_post_meta($post_id, '_wp_attachment_image_alt', $alt_text);
-	wp_send_json_success();
+
+	$response = [
+		'isEmpty' => empty($alt_text)
+	];
+
+	wp_send_json_success($response);
 }
+
 add_action('wp_ajax_save_odm_alt_text', 'odm_save_alt_text');
